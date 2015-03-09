@@ -20,7 +20,7 @@ import uk.gov.hmrc.mongo.MongoConnector
 import reactivemongo.api.FailoverStrategy
 import scala.concurrent.duration.FiniteDuration
 import java.util.concurrent.TimeUnit
-
+import play.api.Logger._
 
 class ReactiveMongoPlugin(app: Application) extends Plugin {
   private var _mongoConnector: Option[MongoConnector] = None
@@ -61,10 +61,25 @@ object ReactiveMongoPlugin {
   }
 
   private [reactivemongo] def parseConf(app: Application): MongoConnector = {
-
-    val mongoConfig = app.configuration.getConfig(s"${app.mode}.mongodb")
-      .getOrElse(app.configuration.getConfig(s"${Mode.Dev}.mongodb")
-      .getOrElse(throw new Exception("The application does not contain required mongodb configuration")))
+    val maybeRunModeConfig = app.configuration.getString("run.mode") flatMap { env =>
+      app.configuration.getConfig(s"$env.mongodb") map { config =>
+        info(s"using mongodb configuration for run.mode = $env")
+        config
+      }
+    }
+    val mongoConfig = maybeRunModeConfig orElse {
+      app.configuration.getConfig(s"${app.mode}.mongodb") map { config =>
+        info(s"using mongodb configuration for app.mode = ${app.mode}")
+        config
+      }
+    } orElse {
+      app.configuration.getConfig(s"${Mode.Dev}.mongodb") map { config =>
+        info(s"using mongodb configuration for app.mode = Dev")
+        config
+      }
+    } getOrElse {
+      throw new Exception("The application does not contain required mongodb configuration")
+    }
 
     mongoConfig.getString("uri") match {
       case Some(uri) => {
