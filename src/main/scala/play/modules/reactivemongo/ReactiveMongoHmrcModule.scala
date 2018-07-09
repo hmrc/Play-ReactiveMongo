@@ -40,30 +40,30 @@ class ReactiveMongoComponentImpl @Inject()(configuration: Configuration, environ
 
   val _mongoConnector: Option[MongoConnector]  = {
 
-    val mongoConfig = configuration.getConfig("mongodb")
-      .getOrElse(configuration.getConfig(s"${environment.mode}.mongodb")
-      .getOrElse(configuration.getConfig(s"${Mode.Dev}.mongodb")
+    val mongoConfig: Configuration = configuration.getOptional[Configuration]("mongodb")
+      .getOrElse(configuration.getOptional[Configuration](s"${environment.mode}.mongodb")
+      .getOrElse(configuration.getOptional[Configuration](s"${Mode.Dev}.mongodb")
       .getOrElse(throw new Exception("The application does not contain required mongodb configuration"))))
 
-    mongoConfig.getString("uri") match {
+    mongoConfig.getOptional[String]("uri") match {
       case Some(uri) => {
 
-        mongoConfig.getInt("channels").foreach { _ =>
+        mongoConfig.getOptional[Int]("channels").foreach { _ =>
           Logger.warn("the mongodb.channels configuration key has been removed and is now ignored. Please use the mongodb URL option described here: https://docs.mongodb.org/manual/reference/connection-string/#connections-connection-options. https://github.com/ReactiveMongo/ReactiveMongo/blob/0.11.3/driver/src/main/scala/api/api.scala#L577")
         }
 
-        val failoverStrategy: Option[FailoverStrategy] = mongoConfig.getConfig("failoverStrategy") match {
+        val failoverStrategy: Option[FailoverStrategy] = mongoConfig.getOptional[Configuration]("failoverStrategy") match {
           case Some(fs: Configuration) => {
 
-            val initialDelay: FiniteDuration = fs.getLong("initialDelayMsecs").map(delay => new FiniteDuration(delay, TimeUnit.MILLISECONDS)).getOrElse(FailoverStrategy().initialDelay)
-            val retries: Int = fs.getInt("retries").getOrElse(FailoverStrategy().retries)
+            val initialDelay: FiniteDuration = fs.getOptional[Long]("initialDelayMsecs").map(delay => new FiniteDuration(delay, TimeUnit.MILLISECONDS)).getOrElse(FailoverStrategy().initialDelay)
+            val retries: Int = fs.getOptional[Int]("retries").getOrElse(FailoverStrategy().retries)
 
-            Some(FailoverStrategy().copy(initialDelay = initialDelay, retries = retries, delayFactor = DelayFactor(fs.getConfig("delay"))))
+            Some(FailoverStrategy().copy(initialDelay = initialDelay, retries = retries, delayFactor = DelayFactor(fs.getOptional[Configuration ]("delay"))))
           }
           case _ => None
         }
 
-        Some(new MongoConnector(uri, failoverStrategy))
+        Some(MongoConnector(uri, failoverStrategy))
       }
       case _ => None
     }
@@ -72,9 +72,7 @@ class ReactiveMongoComponentImpl @Inject()(configuration: Configuration, environ
   lifecycle.addStopHook { () =>
     Future.successful {
       Logger.info("ReactiveMongoPlugin stops, closing connections...")
-      _mongoConnector.map {
-        h => h.close()
-      }
+      _mongoConnector.foreach(_.close())
     }
   }
 
@@ -88,9 +86,9 @@ private [reactivemongo] object DelayFactor {
     delay match {
       case Some(df: Configuration) => {
 
-        val delayFactor = df.getDouble("factor").getOrElse(1.0)
+        val delayFactor = df.getOptional[Double]("factor").getOrElse(1.0)
 
-        df.getString("function") match {
+        df.getOptional[String]("function") match {
           case Some("linear") => linear(delayFactor)
           case Some("exponential") => exponential(delayFactor)
           case Some("static") => static(delayFactor)

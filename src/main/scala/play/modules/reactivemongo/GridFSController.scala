@@ -22,14 +22,14 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.http.{HttpChunk, HttpEntity}
-
-import scala.concurrent.{ExecutionContext, Future}
-import play.api.mvc.{BodyParser, BodyParsers, Controller, MultipartFormData, ResponseHeader, Result}
 import play.api.libs.json.{JsObject, JsValue, Json, Reads}
-import play.api.libs.streams.{Accumulator, Streams}
+import play.api.libs.streams.Accumulator
+import play.api.mvc.{BodyParser, Controller, MultipartFormData, ResponseHeader, Result}
 import play.core.parsers.Multipart
 import reactivemongo.api.gridfs.{DefaultFileToSave, FileToSave, GridFS, ReadFile}
 import reactivemongo.play.json._
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /** A JSON implementation of `FileToSave`. */
 class JSONFileToSave(
@@ -54,9 +54,9 @@ object JSONFileToSave {
 
 object GridFSController {
 
-  import play.api.libs.json.{ JsError, JsResult, JsSuccess }
-  import play.api.libs.functional.syntax._
-  import reactivemongo.play.json.BSONFormats, BSONFormats.{ BSONDateTimeFormat, BSONDocumentFormat }
+  import play.api.libs.json.{JsError, JsResult, JsSuccess}
+  import reactivemongo.play.json.BSONFormats
+  import BSONFormats.{BSONDateTimeFormat, BSONDocumentFormat}
 
   implicit def readFileReads[Id <: JsValue](implicit r: Reads[Id]): Reads[ReadFile[JSONSerializationPack.type, Id]] = new Reads[ReadFile[JSONSerializationPack.type, Id]] {
     def reads(json: JsValue): JsResult[JsReadFile[Id]] = json match {
@@ -108,8 +108,8 @@ object GridFSController {
 trait GridFSController {
   self: Controller =>
 
-  import reactivemongo.api.Cursor
   import GridFSController._
+  import reactivemongo.api.Cursor
 
   val CONTENT_DISPOSITION_ATTACHMENT = "attachment"
   val CONTENT_DISPOSITION_INLINE = "inline"
@@ -142,7 +142,7 @@ trait GridFSController {
     parse.multipartFormData {
       case Multipart.FileInfo(partName, filename, contentType) =>
         val gfsIt = gfs.iteratee(fileToSave(filename, contentType))
-        val sink = Streams.iterateeToAccumulator(gfsIt).toSink
+        val sink = Streams.iterateeToSink(gfsIt)
         Accumulator(
           sink.contramap[ByteString](_.toArray[Byte])
         ).map { ref =>
@@ -157,7 +157,7 @@ trait GridFSController {
       case Multipart.FileInfo(partName, filename, contentType) =>
         Accumulator.flatten(gfs.map { gridFS =>
           val gfsIt = gridFS.iteratee(fileToSave(filename, contentType))
-          val sink = Streams.iterateeToAccumulator(gfsIt).toSink
+          val sink = Streams.iterateeToSink(gfsIt)
 
           Accumulator(
             sink.contramap[ByteString](_.toArray[Byte])
@@ -169,4 +169,5 @@ trait GridFSController {
         })
     }
   }
+
 }
