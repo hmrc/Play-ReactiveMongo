@@ -1,5 +1,7 @@
 # ReactiveMongo Support to Play! Framework
 
+**Deprecated** All functionality is directly included in version 7.0.0 onwards of simple-reactivemongo 
+
 [ ![Download](https://api.bintray.com/packages/hmrc/releases/play-reactivemongo/images/download.svg) ](https://bintray.com/hmrc/releases/play-reactivemongo/_latestVersion)
 
 ## Main features
